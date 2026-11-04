@@ -1,5 +1,7 @@
 mod error;
 mod leetcode;
+mod markdown;
+mod obsidian;
 
 use anyhow::{Context, Result};
 use leetcode::{LeetcodeClient, extract_slug};
@@ -15,6 +17,8 @@ async fn main() -> Result<()> {
     let client = LeetcodeClient::new()?;
 
     let problem = client.fetch_problem(&slug).await?;
+
+    std::fs::write("tests/fixtures/assign_cookies.html", &problem.content)?;
 
     println!("ID: {}", problem.question_frontend_id);
     println!("Title: {}", problem.title);
