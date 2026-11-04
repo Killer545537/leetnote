@@ -3,34 +3,38 @@ mod leetcode;
 mod markdown;
 mod obsidian;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Ok, Result};
+use chrono::Local;
 use leetcode::{LeetcodeClient, extract_slug};
+
+use clap::Parser;
+use leetnote::MarkdownConverter;
+
+use crate::obsidian::NoteRenderer;
+
+#[derive(Debug, Parser)]
+#[command(version, about = "Generate Obsidian notes from Leetcode problems")]
+struct Args {
+    url: String,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let url = std::env::args()
-        .nth(1)
-        .context("Usage: leetnote <leetcode-url>")?;
+    let args = Args::parse();
 
-    let slug = extract_slug(&url)?;
+    let slug = extract_slug(&args.url)?;
 
     let client = LeetcodeClient::new()?;
-
     let problem = client.fetch_problem(&slug).await?;
 
-    std::fs::write("tests/fixtures/assign_cookies.html", &problem.content)?;
+    let converter = MarkdownConverter::new();
+    let statement = converter.convert(&problem.content)?;
 
-    println!("ID: {}", problem.question_frontend_id);
-    println!("Title: {}", problem.title);
-    println!("Difficulty: {:?}", problem.difficulty);
+    let created = Local::now().date_naive();
 
-    println!("\nTags:");
+    let note = NoteRenderer::render(&problem, &statement, created)?;
 
-    for tag in &problem.topic_tags {
-        println!("- {} ({})", tag.name, tag.slug);
-    }
-
-    println!("\nStatement:\n{}", problem.content);
+    println!("{note}");
 
     Ok(())
 }

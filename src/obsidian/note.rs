@@ -44,7 +44,6 @@ impl NoteRenderer {
         note.push_str("---\n");
         note.push_str(&yaml);
         note.push_str("---\n\n");
-        note.push_str(statement);
 
         note.push_str("> [!problem]\n");
         note.push_str(&format!("> **{}**\n>\n", problem.title));
