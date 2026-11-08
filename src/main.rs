@@ -3,38 +3,51 @@ mod leetcode;
 mod markdown;
 mod obsidian;
 
-use anyhow::{Context, Ok, Result};
+use std::path::PathBuf;
+
+use anyhow::{Ok, Result};
 use chrono::Local;
 use leetcode::{LeetcodeClient, extract_slug};
 
 use clap::Parser;
 use leetnote::MarkdownConverter;
 
-use crate::obsidian::NoteRenderer;
+use crate::obsidian::{NoteRenderer, NoteWriter};
 
 #[derive(Debug, Parser)]
 #[command(version, about = "Generate Obsidian notes from Leetcode problems")]
 struct Args {
     url: String,
+
+    /// Directory where the note will be created
+    #[arg(short, long)]
+    output_dir: PathBuf,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
 
+    // Extract problem slug from url
     let slug = extract_slug(&args.url)?;
 
+    // Fetch problem metadata and HTML
     let client = LeetcodeClient::new()?;
     let problem = client.fetch_problem(&slug).await?;
 
+    // Convert HTML statement to Markdown
     let converter = MarkdownConverter::new();
     let statement = converter.convert(&problem.content)?;
 
+    // Render the Obsidian note
     let created = Local::now().date_naive();
-
     let note = NoteRenderer::render(&problem, &statement, created)?;
 
-    println!("{note}");
+    // Write the note without overwriting the existing files
+    let writer = NoteWriter::new(args.output_dir);
+    let path = writer.write(&problem, &note)?;
+
+    println!("Note created: {}", path.display());
 
     Ok(())
 }
