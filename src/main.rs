@@ -4,8 +4,10 @@ use anyhow::Result;
 use chrono::Local;
 use clap::Parser;
 use leetnote::{
-    FmNormalizer, LeetcodeClient, MarkdownConverter, NoteRenderer, NoteWriter, StatementNormalizer,
-    extract_slug,
+    FmNormalizer, LeetcodeClient, MarkdownConverter, NoteWriter,
+    pipeline::{
+        ConvertStatement, FetchProblem, NormalizeStatement, Pipeline, RenderNote, WriteNote,
+    },
 };
 
 #[derive(Debug, Parser)]
@@ -22,30 +24,16 @@ struct Args {
 async fn main() -> Result<()> {
     let args = Args::parse();
 
-    // Extract problem slug from url
-    let slug = extract_slug(&args.url)?;
-
-    // Fetch problem metadata and HTML
-    let client = LeetcodeClient::new()?;
-    let problem = client.fetch_problem(&slug).await?;
-
-    // Convert HTML statement to Markdown
-    let converter = MarkdownConverter::new();
-    let statement = converter.convert(&problem.content)?;
-
-    // Normalize the statement using the Foundation Models API
     let schema_path =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("schemas/statement-normalization.json");
-    let normalizer = FmNormalizer::new(&schema_path);
-    let statement = normalizer.normalize(&statement).await?;
 
-    // Render the Obsidian note
-    let created = Local::now().date_naive();
-    let note = NoteRenderer::render(&problem, &statement, created)?;
+    let pipeline = Pipeline::new(FetchProblem::new(LeetcodeClient::new()?))
+        .then(ConvertStatement::new(MarkdownConverter::new()))
+        .then(NormalizeStatement::new(FmNormalizer::new(schema_path)))
+        .then(RenderNote::new(Local::now().date_naive()))
+        .then(WriteNote::new(NoteWriter::new(args.output_dir)));
 
-    // Write the note without overwriting the existing files
-    let writer = NoteWriter::new(args.output_dir);
-    let path = writer.write(&problem, &note)?;
+    let path = pipeline.run(args.url).await?;
 
     println!("Note created: {}", path.display());
 
