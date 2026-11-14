@@ -4,3 +4,4 @@ mod normalizer;
 
 pub use error::NormalizationError;
 pub use fm::FmNormalizer;
+pub use normalizer::StatementNormalizer;

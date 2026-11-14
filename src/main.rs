@@ -13,7 +13,10 @@ use leetcode::{LeetcodeClient, extract_slug};
 use clap::Parser;
 use leetnote::MarkdownConverter;
 
-use crate::obsidian::{NoteRenderer, NoteWriter};
+use crate::{
+    normalization::{FmNormalizer, StatementNormalizer},
+    obsidian::{NoteRenderer, NoteWriter},
+};
 
 #[derive(Debug, Parser)]
 #[command(version, about = "Generate Obsidian notes from Leetcode problems")]
@@ -39,6 +42,12 @@ async fn main() -> Result<()> {
     // Convert HTML statement to Markdown
     let converter = MarkdownConverter::new();
     let statement = converter.convert(&problem.content)?;
+
+    // Normalize the statement using the Foundation Models API
+    let schema_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("schemas/statement-normalization.json");
+    let normalizer = FmNormalizer::new(&schema_path);
+    let statement = normalizer.normalize(&statement).await?;
 
     // Render the Obsidian note
     let created = Local::now().date_naive();
