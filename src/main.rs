@@ -1,21 +1,11 @@
-mod error;
-mod leetcode;
-mod markdown;
-mod normalization;
-mod obsidian;
-
 use std::path::PathBuf;
 
-use anyhow::{Ok, Result};
+use anyhow::Result;
 use chrono::Local;
-use leetcode::{LeetcodeClient, extract_slug};
-
 use clap::Parser;
-use leetnote::MarkdownConverter;
-
-use crate::{
-    normalization::{FmNormalizer, StatementNormalizer},
-    obsidian::{NoteRenderer, NoteWriter},
+use leetnote::{
+    FmNormalizer, LeetcodeClient, MarkdownConverter, NoteRenderer, NoteWriter, StatementNormalizer,
+    extract_slug,
 };
 
 #[derive(Debug, Parser)]

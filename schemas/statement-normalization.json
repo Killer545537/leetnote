@@ -2,11 +2,25 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
     "properties": {
-        "markdown": {
-            "type": "string",
-            "description": "The normalized Markdown document"
+        "expressions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "original": {
+                        "type": "string",
+                        "description": "The exact candidate expression from the input list"
+                    },
+                    "latex": {
+                        "type": "string",
+                        "description": "The normalized inline LaTeX expression wrapped in $...$"
+                    }
+                },
+                "required": ["original", "latex"],
+                "additionalProperties": false
+            }
         }
     },
-    "required": ["markdown"],
+    "required": ["expressions"],
     "additionalProperties": false
 }
