@@ -1,6 +1,7 @@
 mod error;
 mod leetcode;
 mod markdown;
+mod normalization;
 mod obsidian;
 
 use std::path::PathBuf;
