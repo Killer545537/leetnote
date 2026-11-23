@@ -103,7 +103,7 @@ async fn converts_normalizes_renders_and_writes_a_note() {
 }
 
 #[tokio::test]
-async fn normalization_failure_prevents_writing_and_preserves_the_error_source() {
+async fn normalization_failure_still_writes_the_note_with_math_as_written() {
     let directory = tempfile::tempdir().unwrap();
     let output = directory.path().join("notes");
     let pipeline = Pipeline::new(ConvertStatement::new(MarkdownConverter::new()))
@@ -111,10 +111,9 @@ async fn normalization_failure_prevents_writing_and_preserves_the_error_source()
         .then(RenderNote::new(NaiveDate::from_ymd_opt(2026, 11, 14).unwrap()))
         .then(WriteNote::new(NoteWriter::new(&output)));
 
-    let error = pipeline.run(problem()).await.unwrap_err();
-    assert_eq!(error.to_string(), "Failed to normalize mathematical expressions");
-    assert!(matches!(error.downcast_ref::<NormalizationError>(), Some(NormalizationError::UnknownCandidate(_))));
-    assert!(!output.exists());
+    let path = pipeline.run(problem()).await.unwrap();
+    let content = std::fs::read_to_string(path).unwrap();
+    assert!(content.contains("> The `i^{th}` child uses `nums[i]`."));
 }
 
 #[tokio::test]

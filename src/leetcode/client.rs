@@ -1,6 +1,6 @@
 use reqwest::Client;
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::leetcode::models::Problem;
 
@@ -36,7 +36,8 @@ struct GraphQlError {
 
 #[derive(Debug, Deserialize)]
 struct QuestionData {
-    question: Option<Problem>,
+    // Raw JSON so a premium problem's `content: null` gives a clear error instead of a decode failure.
+    question: Option<Value>,
 }
 
 pub struct LeetcodeClient {
@@ -76,6 +77,33 @@ impl LeetcodeClient {
 
         let data = result.data.ok_or_else(|| LeetcodeError::UnexpectedResponse("Missing GraphQL data".into()))?;
 
-        data.question.ok_or_else(|| LeetcodeError::ProblemNotFound(slug.to_owned()))
+        let question = data.question.ok_or_else(|| LeetcodeError::ProblemNotFound(slug.to_owned()))?;
+        parse_question(question, slug)
+    }
+}
+
+fn parse_question(question: Value, slug: &str) -> Result<Problem> {
+    if question["content"].is_null() {
+        return Err(LeetcodeError::PremiumOnly(slug.to_owned()));
+    }
+    serde_json::from_value(question).map_err(|err| LeetcodeError::UnexpectedResponse(err.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn premium_problem_without_content_is_a_clear_error() {
+        let question = json!({
+            "questionFrontendId": "252", "title": "Meeting Rooms", "titleSlug": "meeting-rooms",
+            "difficulty": "Easy", "content": null, "topicTags": [],
+        });
+        let err = parse_question(question.clone(), "meeting-rooms").unwrap_err();
+        assert!(matches!(err, LeetcodeError::PremiumOnly(ref slug) if slug == "meeting-rooms"));
+
+        let mut free = question;
+        free["content"] = json!("<p>Statement</p>");
+        assert_eq!(parse_question(free, "meeting-rooms").unwrap().content, "<p>Statement</p>");
     }
 }

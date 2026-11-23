@@ -119,11 +119,15 @@ impl<N: StatementNormalizer> Stage for NormalizeStatement<N> {
     type Output = Statement;
 
     async fn run(&self, statement: Statement) -> Result<Statement> {
-        let markdown = self
-            .normalizer
-            .normalize(&statement.markdown)
-            .await
-            .context("Failed to normalize mathematical expressions")?;
+        // A note with the math as LeetCode wrote it beats no note: `fm` may be missing (pre-macOS 27),
+        // unlicensed or busy, and a rejected model answer is never partially applied.
+        let markdown = match self.normalizer.normalize(&statement.markdown).await {
+            Ok(markdown) => markdown,
+            Err(err) => {
+                eprintln!("warning: math left as written, normalization failed: {err}");
+                statement.markdown
+            }
+        };
         Ok(Statement { problem: statement.problem, markdown })
     }
 }

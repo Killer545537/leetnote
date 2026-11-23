@@ -37,6 +37,9 @@ Examples:
 - Input: "ans[j]" -> Exclude
 "#;
 
+/// JSON schema for `fm respond --schema`, compiled in so an installed binary doesn't depend on the source tree.
+pub const SCHEMA: &str = include_str!("../../schemas/statement-normalization.json");
+
 pub struct FmNormalizer {
     executable: PathBuf,
     schema_path: PathBuf,

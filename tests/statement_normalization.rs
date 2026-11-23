@@ -54,9 +54,7 @@ fn read_recorded_prompt(prompt_path: &Path) -> Option<String> {
 
 #[test]
 fn schema_file_enforces_structured_expressions_contract() {
-    let schema_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("schemas/statement-normalization.json");
-    let content = fs::read_to_string(schema_path).unwrap();
-    let schema: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let schema: serde_json::Value = serde_json::from_str(leetnote::normalization::SCHEMA).unwrap();
 
     assert_eq!(schema["type"], "object");
     assert_eq!(schema["additionalProperties"], false);

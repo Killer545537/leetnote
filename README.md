@@ -9,7 +9,8 @@ Given a problem URL, `leetnote` fetches the problem from LeetCode, converts the 
 1. Extracts the problem slug from the URL (query parameters and a trailing `/description/` are ignored).
 2. Fetches the problem's ID, title, difficulty, tags and statement from LeetCode.
 3. Converts the HTML statement to Markdown.
-4. Writes `<Problem Title>.md` to the output directory, creating the directory if it does not exist.
+4. Converts math such as `1 <= n <= 2 * 10^{5}` to LaTeX (`$1 \leq n \leq 2 \times 10^{5}$`) with Apple's on-device model through the `fm` CLI (macOS 27+). If `fm` is missing or fails, the note is still written with the math as LeetCode wrote it, and a warning is printed.
+5. Writes `<Problem Title>.md` to the output directory, creating the directory if it does not exist.
 
 The note contains:
 
@@ -31,6 +32,7 @@ leetnote <URL> --output-dir <DIR>
 | ------------------------ | -------------------------------------------- |
 | `<URL>`                  | A `https://leetcode.com/problems/...` URL    |
 | `-o`, `--output-dir <DIR>` | Directory where the note will be created   |
+| `--no-normalize`         | Skip the LaTeX conversion (no `fm` call)     |
 
 ### Example
 
@@ -53,6 +55,8 @@ Quote the URL (it often contains `&`). Quote the directory if it contains spaces
 - `https://leetcode.com/problems/two-sum/?envType=study-plan`
 
 Only `https` URLs on `leetcode.com` with a `/problems/<slug>` path are accepted.
+
+Premium problems are rejected with an error: LeetCode doesn't return their statement without a subscription.
 
 ## Build
 

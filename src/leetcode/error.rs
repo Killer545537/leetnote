@@ -14,6 +14,9 @@ pub enum LeetcodeError {
     #[error("problem not found: {0}")]
     ProblemNotFound(String),
 
+    #[error("{0} is a premium problem; LeetCode doesn't return its statement without a subscription")]
+    PremiumOnly(String),
+
     #[error("unexpected response: {0}")]
     UnexpectedResponse(String),
 }
