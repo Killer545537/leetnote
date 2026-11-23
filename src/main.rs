@@ -14,8 +14,8 @@ use leetnote::{
 struct Args {
     url: String,
 
-    /// Directory where the note will be created
-    #[arg(short, long)]
+    /// Directory where the note will be created (e.g. your Obsidian vault folder)
+    #[arg(short, long, env = "LEETNOTE_DIR")]
     output_dir: PathBuf,
 
     /// Keep math as LeetCode writes it instead of converting it to LaTeX with Apple's `fm` (macOS 27+)

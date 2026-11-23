@@ -31,7 +31,7 @@ leetnote <URL> --output-dir <DIR>
 | Argument                 | Description                                  |
 | ------------------------ | -------------------------------------------- |
 | `<URL>`                  | A `https://leetcode.com/problems/...` URL    |
-| `-o`, `--output-dir <DIR>` | Directory where the note will be created   |
+| `-o`, `--output-dir <DIR>` | Directory where the note will be created. Defaults to `$LEETNOTE_DIR` |
 | `--no-normalize`         | Skip the LaTeX conversion (no `fm` call)     |
 
 ### Example
@@ -44,6 +44,13 @@ cargo run -- \
 
 ```
 Note created: /Users/you/Documents/Obsidian Vault/Leetcode/Assign Cookies.md
+```
+
+To skip `-o` every time, set a default directory in your shell profile. An explicit `-o` still takes precedence:
+
+```sh
+export LEETNOTE_DIR="$HOME/Documents/Obsidian Vault/Leetcode"
+leetnote "https://leetcode.com/problems/assign-cookies/"
 ```
 
 Quote the URL (it often contains `&`). Quote the directory if it contains spaces, but don't also escape the spaces with backslashes, or the backslashes become part of the path.
