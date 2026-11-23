@@ -78,176 +78,83 @@ fn is_closing_fence(line: &str, fence_char: u8, min_len: usize) -> bool {
     count >= min_len && trimmed[count..].trim().is_empty()
 }
 
+/// Byte offset past blockquote markers, indentation, and a heading or list marker.
 fn skip_line_prefix(line: &str) -> usize {
-    let bytes = line.as_bytes();
-    let mut idx = 0;
-
-    // Skip leading whitespace and blockquote `>` markers
-    loop {
-        while idx < bytes.len() && matches!(bytes[idx], b' ' | b'\t') {
-            idx += 1;
-        }
-        if idx < bytes.len() && bytes[idx] == b'>' {
-            idx += 1;
-            continue;
-        }
-        break;
-    }
-
-    // Skip ATX heading markers (`#`, `##`, etc.) followed by space
-    let heading_start = idx;
-    while idx < bytes.len() && bytes[idx] == b'#' {
-        idx += 1;
-    }
-    if idx > heading_start {
-        if idx < bytes.len() && matches!(bytes[idx], b' ' | b'\t') {
-            while idx < bytes.len() && matches!(bytes[idx], b' ' | b'\t') {
-                idx += 1;
-            }
-            return idx;
-        }
-        idx = heading_start;
-    }
-
-    // Skip unordered list markers (`* `, `- `, `+ `)
-    if idx + 1 < bytes.len()
-        && matches!(bytes[idx], b'*' | b'-' | b'+')
-        && matches!(bytes[idx + 1], b' ' | b'\t')
-    {
-        idx += 1;
-        while idx < bytes.len() && matches!(bytes[idx], b' ' | b'\t') {
-            idx += 1;
-        }
-        return idx;
-    }
-
-    // Skip ordered list markers (`1. `, `2) `)
-    let digits_start = idx;
-    while idx < bytes.len() && bytes[idx].is_ascii_digit() {
-        idx += 1;
-    }
-    if idx > digits_start
-        && idx + 1 < bytes.len()
-        && matches!(bytes[idx], b'.' | b')')
-        && matches!(bytes[idx + 1], b' ' | b'\t')
-    {
-        idx += 1;
-        while idx < bytes.len() && matches!(bytes[idx], b' ' | b'\t') {
-            idx += 1;
-        }
-        return idx;
-    }
-    idx = digits_start;
-
-    idx
+    let rest = strip_blockquote_and_indent(line);
+    let digits = rest.trim_start_matches(|c: char| c.is_ascii_digit());
+    // `## `, `- ` / `* ` / `+ `, `1. ` / `1) `: a marker only counts when whitespace follows.
+    let after_marker = [
+        Some(rest.trim_start_matches('#')),
+        rest.strip_prefix(['*', '-', '+']),
+        Some(digits)
+            .filter(|d| d.len() < rest.len())
+            .and_then(|d| d.strip_prefix(['.', ')'])),
+    ];
+    let body = after_marker
+        .into_iter()
+        .flatten()
+        .find(|after| after.len() < rest.len() && after.starts_with([' ', '\t']))
+        .map_or(rest, |after| after.trim_start_matches([' ', '\t']));
+    line.len() - body.len()
 }
 
 fn extract_line_candidates(line: &str, line_offset: usize, candidates: &mut Vec<Candidate>) {
-    let start_idx = skip_line_prefix(line);
     let bytes = line.as_bytes();
-    let mut idx = start_idx;
-    let mut plain_start = start_idx;
+    let mut idx = skip_line_prefix(line);
+    let mut plain_start = idx;
 
     while idx < bytes.len() {
-        match bytes[idx] {
-            b'`' => {
-                let tick_count = bytes[idx..].iter().take_while(|&&b| b == b'`').count();
-                let content_start = idx + tick_count;
+        let run = bytes[idx..]
+            .iter()
+            .take_while(|&&b| b == bytes[idx])
+            .count();
+        // Ok(end): a code span, link, autolink or existing `$math$` ending at `end`.
+        // Err(step): not one; move on. Every arm matches an ASCII byte, so `line[idx..]` is safe.
+        let skip = match bytes[idx] {
+            b'`' => find_closing_backticks(&bytes[idx + run..], run)
+                .map(|close| idx + 2 * run + close)
+                .ok_or(run),
+            b'$' => {
+                let delim = &line[idx..idx + run.min(2)];
+                line[idx + delim.len()..]
+                    .find(delim)
+                    .map(|close| idx + 2 * delim.len() + close)
+                    .ok_or(delim.len())
+            }
+            b'!' if bytes.get(idx + 1) == Some(&b'[') => {
+                find_markdown_link_end(line, idx + 1).ok_or(1)
+            }
+            b'[' => find_markdown_link_end(line, idx).ok_or(1),
+            b'<' if line[idx..].starts_with("<https://") || line[idx..].starts_with("<http://") => {
+                line[idx..].find('>').map(|close| idx + close + 1).ok_or(1)
+            }
+            _ => Err(1),
+        };
 
-                if let Some(close_rel) = find_closing_backticks(&bytes[content_start..], tick_count)
-                {
-                    extract_plain_text_candidates(
-                        &line[plain_start..idx],
-                        line_offset + plain_start,
-                        candidates,
-                    );
-
-                    let close_start = content_start + close_rel;
-                    let close_end = close_start + tick_count;
-                    let inner = strip_zero_width(line[content_start..close_start].trim());
-
+        match skip {
+            Err(step) => idx += step,
+            Ok(end) => {
+                extract_plain_text_candidates(
+                    &line[plain_start..idx],
+                    line_offset + plain_start,
+                    candidates,
+                );
+                if bytes[idx] == b'`' {
+                    let inner = strip_zero_width(line[idx + run..end - run].trim());
                     if is_inline_code_math_candidate(&inner) {
                         candidates.push(Candidate {
                             original: inner,
-                            span: (line_offset + idx)..(line_offset + close_end),
+                            span: (line_offset + idx)..(line_offset + end),
                         });
                     }
-
-                    idx = close_end;
-                    plain_start = close_end;
-                } else {
-                    idx += tick_count;
                 }
-            }
-            b'!' if idx + 1 < bytes.len() && bytes[idx + 1] == b'[' => {
-                if let Some(link_end) = find_markdown_link_end(line, idx + 1) {
-                    extract_plain_text_candidates(
-                        &line[plain_start..idx],
-                        line_offset + plain_start,
-                        candidates,
-                    );
-                    idx = link_end;
-                    plain_start = link_end;
-                } else {
-                    idx += 1;
-                }
-            }
-            b'[' => {
-                if let Some(link_end) = find_markdown_link_end(line, idx) {
-                    extract_plain_text_candidates(
-                        &line[plain_start..idx],
-                        line_offset + plain_start,
-                        candidates,
-                    );
-                    idx = link_end;
-                    plain_start = link_end;
-                } else {
-                    idx += 1;
-                }
-            }
-            b'<' if line[idx..].starts_with("<https://") || line[idx..].starts_with("<http://") => {
-                if let Some(rel_end) = line[idx..].find('>') {
-                    extract_plain_text_candidates(
-                        &line[plain_start..idx],
-                        line_offset + plain_start,
-                        candidates,
-                    );
-                    idx += rel_end + 1;
-                    plain_start = idx;
-                } else {
-                    idx += 1;
-                }
-            }
-            b'$' => {
-                let delim_len = if idx + 1 < bytes.len() && bytes[idx + 1] == b'$' {
-                    2
-                } else {
-                    1
-                };
-                let search_start = idx + delim_len;
-                let delim = &line[idx..search_start];
-
-                if let Some(rel_close) = line[search_start..].find(delim) {
-                    extract_plain_text_candidates(
-                        &line[plain_start..idx],
-                        line_offset + plain_start,
-                        candidates,
-                    );
-                    idx = search_start + rel_close + delim_len;
-                    plain_start = idx;
-                } else {
-                    idx += delim_len;
-                }
-            }
-            _ => {
-                idx += 1;
+                idx = end;
+                plain_start = end;
             }
         }
     }
 
-    if plain_start < bytes.len() {
-        extract_plain_text_candidates(&line[plain_start..], line_offset + plain_start, candidates);
-    }
+    extract_plain_text_candidates(&line[plain_start..], line_offset + plain_start, candidates);
 }
 
 fn find_closing_backticks(bytes: &[u8], tick_count: usize) -> Option<usize> {
@@ -441,7 +348,7 @@ fn extract_plain_text_candidates(
     }
 }
 
-fn strip_zero_width(input: &str) -> String {
+pub(super) fn strip_zero_width(input: &str) -> String {
     input
         .chars()
         .filter(|&ch| !matches!(ch, '\u{200b}' | '\u{200c}' | '\u{200d}' | '\u{feff}'))
@@ -519,6 +426,21 @@ assert 1 <= n <= 2 * 10^{5}
 
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].original, "i^{th}");
+    }
+
+    #[test]
+    fn skips_only_real_line_markers() {
+        for (line, body) in [
+            ("> - 1 <= n", "1 <= n"),
+            ("  ## 10^{5}", "10^{5}"),
+            ("12) x", "x"),
+            ("#x", "#x"),
+            (". x", ". x"),
+            ("-1 <= n", "-1 <= n"),
+            ("1.5 * n", "1.5 * n"),
+        ] {
+            assert_eq!(&line[skip_line_prefix(line)..], body, "{line:?}");
+        }
     }
 
     #[test]

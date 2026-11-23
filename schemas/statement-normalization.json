@@ -16,11 +16,23 @@
                         "description": "The normalized inline LaTeX expression wrapped in $...$"
                     }
                 },
-                "required": ["original", "latex"],
-                "additionalProperties": false
+                "required": [
+                    "original",
+                    "latex"
+                ],
+                "additionalProperties": false,
+                "x-order": [
+                    "original",
+                    "latex"
+                ]
             }
         }
     },
-    "required": ["expressions"],
-    "additionalProperties": false
+    "required": [
+        "expressions"
+    ],
+    "additionalProperties": false,
+    "x-order": [
+        "expressions"
+    ]
 }

@@ -24,9 +24,9 @@ impl NoteWriter {
             source,
         })?;
 
-        let filename = Self::generate_filename(&problem.title);
-
-        let path = self.directory.join(filename);
+        let path = self
+            .directory
+            .join(format!("{}.md", Self::sanitize_filename(&problem.title)));
 
         let mut file = match OpenOptions::new().write(true).create_new(true).open(&path) {
             Ok(file) => file,
@@ -44,10 +44,6 @@ impl NoteWriter {
         }
 
         Ok(path)
-    }
-
-    fn generate_filename(title: &str) -> String {
-        format!("{}.md", Self::sanitize_filename(title))
     }
 
     fn sanitize_filename(input: &str) -> String {

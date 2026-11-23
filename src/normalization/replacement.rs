@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    candidate::Candidate,
+    candidate::{Candidate, strip_zero_width},
     error::{NormalizationError, Result},
 };
 
@@ -132,13 +132,6 @@ fn matches_source_slice(slice: &str, expected_original: &str) -> bool {
 
     let inner = slice[tick_count..slice.len() - tick_count].trim();
     strip_zero_width(inner) == expected_original
-}
-
-fn strip_zero_width(input: &str) -> String {
-    input
-        .chars()
-        .filter(|&ch| !matches!(ch, '\u{200b}' | '\u{200c}' | '\u{200d}' | '\u{feff}'))
-        .collect()
 }
 
 fn validate_latex(original: &str, latex: &str) -> Result<()> {

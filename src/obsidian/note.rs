@@ -38,29 +38,18 @@ impl NoteRenderer {
         };
 
         let yaml = serde_yaml::to_string(&frontmatter)?;
+        let callout: String = statement
+            .lines()
+            .map(|line| match line {
+                "" => ">\n".to_owned(),
+                line => format!("> {line}\n"),
+            })
+            .collect();
 
-        let mut note = String::new();
-
-        note.push_str("---\n");
-        note.push_str(&yaml);
-        note.push_str("---\n\n");
-
-        note.push_str("> [!problem]\n");
-        note.push_str(&format!("> **{}**\n>\n", problem.title));
-
-        for line in statement.lines() {
-            if line.is_empty() {
-                note.push_str(">\n");
-            } else {
-                note.push_str(&format!("> {}\n", line));
-            }
-        }
-
-        note.push_str("\n## Observations\n");
-        note.push_str("\n## Key Insight\n");
-        note.push_str("\n## Algorithm\n");
-
-        Ok(note)
+        Ok(format!(
+            "---\n{yaml}---\n\n> [!problem]\n> **{}**\n>\n{callout}\n## Observations\n\n## Key Insight\n\n## Algorithm\n",
+            problem.title
+        ))
     }
 
     fn difficulty_name(difficulty: &Difficulty) -> &str {

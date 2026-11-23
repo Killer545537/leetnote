@@ -1,6 +1,6 @@
-use std::{path::PathBuf, process::Stdio};
+use std::{collections::HashSet, path::PathBuf};
 
-use tokio::{io::AsyncReadExt, process::Command};
+use tokio::process::Command;
 
 use super::{
     candidate::{Candidate, extract_candidates},
@@ -55,76 +55,42 @@ impl FmNormalizer {
         self
     }
 
-    pub async fn classify(
-        &self,
-        candidates: &[Candidate],
-    ) -> Result<Vec<ExpressionTransformation>> {
-        if candidates.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let mut unique_originals: Vec<&str> = Vec::with_capacity(candidates.len());
-        for candidate in candidates {
-            let original = candidate.original.as_str();
-            if !unique_originals.contains(&original) {
-                unique_originals.push(original);
-            }
-        }
-
-        let formatted_candidates = unique_originals
+    async fn classify(&self, candidates: &[Candidate]) -> Result<Vec<ExpressionTransformation>> {
+        let mut seen = HashSet::new();
+        let list: Vec<String> = candidates
             .iter()
-            .map(|candidate| format!("- {candidate:?}"))
-            .collect::<Vec<_>>()
-            .join("\n");
-
+            .map(|candidate| candidate.original.as_str())
+            .filter(|original| seen.insert(*original))
+            .map(|original| format!("- {original:?}"))
+            .collect();
         let prompt = format!(
-            "Classify and convert the following candidate expressions:\n\
-            {formatted_candidates}"
+            "Classify and convert the following candidate expressions:\n{}",
+            list.join("\n")
         );
 
-        let response = self.invoke(&prompt).await?;
-        Ok(response.expressions)
-    }
-
-    async fn invoke(&self, prompt: &str) -> Result<NormalizationResponse> {
-        let mut child = Command::new(&self.executable)
+        // ponytail: no timeout; fm can stall under load. Wrap in tokio::time::timeout if that bites.
+        let output = Command::new(&self.executable)
             .arg("respond")
             .arg("--instructions")
             .arg(INSTRUCTIONS)
             .arg("--schema")
             .arg(&self.schema_path)
             .arg(prompt)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            // Pin the on-device model so a `defaultModel` in ~/.fm/config.json can't redirect us.
+            .args(["-m", "system"])
             .kill_on_drop(true)
-            .spawn()?;
+            .output()
+            .await?;
 
-        let mut stdout = child.stdout.take().expect("stdout is piped");
-        let mut stderr = child.stderr.take().expect("stderr is piped");
-
-        let mut stdout_buffer = Vec::new();
-        let mut stderr_buffer = Vec::new();
-
-        let (stdout_result, stderr_result, status_result) = tokio::join!(
-            stdout.read_to_end(&mut stdout_buffer),
-            stderr.read_to_end(&mut stderr_buffer),
-            child.wait(),
-        );
-
-        stdout_result?;
-        stderr_result?;
-        let status = status_result?;
-
-        if !status.success() {
+        if !output.status.success() {
             return Err(NormalizationError::ProcessFailed {
-                status,
-                stderr: String::from_utf8_lossy(&stderr_buffer).into_owned(),
+                status: output.status,
+                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
             });
         }
 
-        let response: NormalizationResponse = serde_json::from_slice(&stdout_buffer)?;
-        Ok(response)
+        let response: NormalizationResponse = serde_json::from_slice(&output.stdout)?;
+        Ok(response.expressions)
     }
 }
 

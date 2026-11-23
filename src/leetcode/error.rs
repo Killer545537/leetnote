@@ -8,9 +8,6 @@ pub enum LeetcodeError {
     #[error("HTTP request failed")]
     Http(#[from] reqwest::Error),
 
-    #[error("failed to deserialize response")]
-    Json(#[from] serde_json::Error),
-
     #[error("GraphQL request failed: {0}")]
     GraphQL(String),
 
