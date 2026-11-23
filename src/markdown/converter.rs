@@ -12,32 +12,24 @@ pub struct MarkdownConverter {
 
 impl MarkdownConverter {
     pub fn new() -> Self {
-        let converter = HtmlToMarkdown::builder()
-            .skip_tags(vec!["img", "script", "style", "noscript"])
-            .build();
+        let converter = HtmlToMarkdown::builder().skip_tags(vec!["img", "script", "style", "noscript"]).build();
 
         Self { converter }
     }
 
     pub fn convert(&self, html: &str) -> Result<String> {
         let html = Self::preprocess_html(html);
-        let markdown = self
-            .converter
-            .convert(&html)
-            .map_err(|err| MarkdownError::Conversion(err.to_string()))?;
+        let markdown = self.converter.convert(&html).map_err(|err| MarkdownError::Conversion(err.to_string()))?;
 
         Ok(Self::normalize_markdown(&markdown))
     }
 
     fn preprocess_html(html: &str) -> String {
-        static SUPERSCRIPT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"(?is)<sup\b[^>]*>(.*?)</sup>").expect("valid superscript regex")
-        });
+        static SUPERSCRIPT_REGEX: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(?is)<sup\b[^>]*>(.*?)</sup>").expect("valid superscript regex"));
 
         SUPERSCRIPT_REGEX
-            .replace_all(html, |captures: &Captures<'_>| {
-                format!("^{{{}}}", captures[1].trim())
-            })
+            .replace_all(html, |captures: &Captures<'_>| format!("^{{{}}}", captures[1].trim()))
             .into_owned()
     }
 

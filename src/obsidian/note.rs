@@ -23,16 +23,9 @@ impl NoteRenderer {
         let frontmatter = FrontMatter {
             created,
             number: &problem.question_frontend_id,
-            tags: problem
-                .topic_tags
-                .iter()
-                .map(|tag| tag.slug.as_str())
-                .collect(),
+            tags: problem.topic_tags.iter().map(|tag| tag.slug.as_str()).collect(),
             difficulty: Self::difficulty_name(&problem.difficulty),
-            url: format!(
-                "https://leetcode.com/problems/{}/description/",
-                problem.title_slug
-            ),
+            url: format!("https://leetcode.com/problems/{}/description/", problem.title_slug),
             note_type: "problem",
             status: "todo",
         };
@@ -78,22 +71,15 @@ mod tests {
             difficulty: Difficulty::Easy,
             content: String::new(),
             topic_tags: vec![
-                TopicTag {
-                    name: "Array".into(),
-                    slug: "array".into(),
-                },
-                TopicTag {
-                    name: "Greedy".into(),
-                    slug: "greedy".into(),
-                },
+                TopicTag { name: "Array".into(), slug: "array".into() },
+                TopicTag { name: "Greedy".into(), slug: "greedy".into() },
             ],
         }
     }
 
     #[test]
     fn renders_frontmatter() {
-        let note =
-            NoteRenderer::render(&sample_problem(), "Problem statement.", test_date()).unwrap();
+        let note = NoteRenderer::render(&sample_problem(), "Problem statement.", test_date()).unwrap();
 
         assert!(note.contains("number: '455'"));
         assert!(note.contains("difficulty: easy"));
@@ -105,12 +91,8 @@ mod tests {
 
     #[test]
     fn renders_problem_callout() {
-        let note = NoteRenderer::render(
-            &sample_problem(),
-            "First paragraph.\n\nSecond paragraph.",
-            test_date(),
-        )
-        .unwrap();
+        let note =
+            NoteRenderer::render(&sample_problem(), "First paragraph.\n\nSecond paragraph.", test_date()).unwrap();
 
         assert!(note.contains("> [!problem]"));
         assert!(note.contains("> **Assign Cookies**"));
@@ -120,8 +102,7 @@ mod tests {
 
     #[test]
     fn renders_empty_solution_sections() {
-        let note =
-            NoteRenderer::render(&sample_problem(), "Problem statement.", test_date()).unwrap();
+        let note = NoteRenderer::render(&sample_problem(), "Problem statement.", test_date()).unwrap();
 
         assert!(note.contains("## Observations"));
         assert!(note.contains("## Key Insight"));

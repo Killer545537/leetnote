@@ -10,9 +10,7 @@ pub fn extract_slug(input: &str) -> Result<String> {
     }
 
     if url.host_str() != Some("leetcode.com") {
-        return Err(LeetcodeError::InvalidUrl(
-            "Expected leetcode.com hostname".into(),
-        ));
+        return Err(LeetcodeError::InvalidUrl("Expected leetcode.com hostname".into()));
     }
 
     let segments: Vec<&str> = url
@@ -22,16 +20,11 @@ pub fn extract_slug(input: &str) -> Result<String> {
         .collect();
 
     if segments.len() < 2 || segments[0] != "problems" {
-        return Err(LeetcodeError::InvalidUrl(
-            "Expected /problems/{slug}/".into(),
-        ));
+        return Err(LeetcodeError::InvalidUrl("Expected /problems/{slug}/".into()));
     }
 
     let slug = segments[1];
-    if !slug
-        .bytes()
-        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
-    {
+    if !slug.bytes().all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-') {
         return Err(LeetcodeError::InvalidUrl("Invalid problem slug".into()));
     }
 

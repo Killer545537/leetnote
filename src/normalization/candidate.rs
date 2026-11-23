@@ -18,9 +18,7 @@ pub fn extract_candidates(markdown: &str) -> Vec<Candidate> {
         offset += line.len();
 
         let line_without_newline = line.strip_suffix('\n').unwrap_or(line);
-        let line_without_cr = line_without_newline
-            .strip_suffix('\r')
-            .unwrap_or(line_without_newline);
+        let line_without_cr = line_without_newline.strip_suffix('\r').unwrap_or(line_without_newline);
 
         if let Some((fence_char, fence_len)) = active_fence {
             if is_closing_fence(line_without_cr, fence_char, fence_len) {
@@ -86,9 +84,7 @@ fn skip_line_prefix(line: &str) -> usize {
     let after_marker = [
         Some(rest.trim_start_matches('#')),
         rest.strip_prefix(['*', '-', '+']),
-        Some(digits)
-            .filter(|d| d.len() < rest.len())
-            .and_then(|d| d.strip_prefix(['.', ')'])),
+        Some(digits).filter(|d| d.len() < rest.len()).and_then(|d| d.strip_prefix(['.', ')'])),
     ];
     let body = after_marker
         .into_iter()
@@ -104,26 +100,16 @@ fn extract_line_candidates(line: &str, line_offset: usize, candidates: &mut Vec<
     let mut plain_start = idx;
 
     while idx < bytes.len() {
-        let run = bytes[idx..]
-            .iter()
-            .take_while(|&&b| b == bytes[idx])
-            .count();
+        let run = bytes[idx..].iter().take_while(|&&b| b == bytes[idx]).count();
         // Ok(end): a code span, link, autolink or existing `$math$` ending at `end`.
         // Err(step): not one; move on. Every arm matches an ASCII byte, so `line[idx..]` is safe.
         let skip = match bytes[idx] {
-            b'`' => find_closing_backticks(&bytes[idx + run..], run)
-                .map(|close| idx + 2 * run + close)
-                .ok_or(run),
+            b'`' => find_closing_backticks(&bytes[idx + run..], run).map(|close| idx + 2 * run + close).ok_or(run),
             b'$' => {
                 let delim = &line[idx..idx + run.min(2)];
-                line[idx + delim.len()..]
-                    .find(delim)
-                    .map(|close| idx + 2 * delim.len() + close)
-                    .ok_or(delim.len())
+                line[idx + delim.len()..].find(delim).map(|close| idx + 2 * delim.len() + close).ok_or(delim.len())
             }
-            b'!' if bytes.get(idx + 1) == Some(&b'[') => {
-                find_markdown_link_end(line, idx + 1).ok_or(1)
-            }
+            b'!' if bytes.get(idx + 1) == Some(&b'[') => find_markdown_link_end(line, idx + 1).ok_or(1),
             b'[' => find_markdown_link_end(line, idx).ok_or(1),
             b'<' if line[idx..].starts_with("<https://") || line[idx..].starts_with("<http://") => {
                 line[idx..].find('>').map(|close| idx + close + 1).ok_or(1)
@@ -134,18 +120,11 @@ fn extract_line_candidates(line: &str, line_offset: usize, candidates: &mut Vec<
         match skip {
             Err(step) => idx += step,
             Ok(end) => {
-                extract_plain_text_candidates(
-                    &line[plain_start..idx],
-                    line_offset + plain_start,
-                    candidates,
-                );
+                extract_plain_text_candidates(&line[plain_start..idx], line_offset + plain_start, candidates);
                 if bytes[idx] == b'`' {
                     let inner = strip_zero_width(line[idx + run..end - run].trim());
                     if is_inline_code_math_candidate(&inner) {
-                        candidates.push(Candidate {
-                            original: inner,
-                            span: (line_offset + idx)..(line_offset + end),
-                        });
+                        candidates.push(Candidate { original: inner, span: (line_offset + idx)..(line_offset + end) });
                     }
                 }
                 idx = end;
@@ -243,24 +222,18 @@ fn is_inline_code_math_candidate(inner: &str) -> bool {
         return false;
     }
 
-    static SUPERSCRIPT_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"[A-Za-z0-9)}\s]\^(?:\{[^}]+\}|[0-9A-Za-z]+)").expect("valid superscript regex")
-    });
+    static SUPERSCRIPT_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"[A-Za-z0-9)}\s]\^(?:\{[^}]+\}|[0-9A-Za-z]+)").expect("valid superscript regex"));
 
     static INEQUALITY_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(
-            r"[A-Za-z0-9)}]\s*(?:<=|>=|!=)\s*[-+A-Za-z0-9({]|[A-Za-z0-9)}]\s+[<>]\s+[-+A-Za-z0-9({]",
-        )
-        .expect("valid inequality regex")
+        Regex::new(r"[A-Za-z0-9)}]\s*(?:<=|>=|!=)\s*[-+A-Za-z0-9({]|[A-Za-z0-9)}]\s+[<>]\s+[-+A-Za-z0-9({]")
+            .expect("valid inequality regex")
     });
 
-    static MULTIPLICATION_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"[A-Za-z0-9)}]\s*\*\s*[A-Za-z0-9({]").expect("valid multiplication regex")
-    });
+    static MULTIPLICATION_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"[A-Za-z0-9)}]\s*\*\s*[A-Za-z0-9({]").expect("valid multiplication regex"));
 
-    SUPERSCRIPT_RE.is_match(inner)
-        || INEQUALITY_RE.is_match(inner)
-        || MULTIPLICATION_RE.is_match(inner)
+    SUPERSCRIPT_RE.is_match(inner) || INEQUALITY_RE.is_match(inner) || MULTIPLICATION_RE.is_match(inner)
 }
 
 fn has_programming_syntax(input: &str) -> bool {
@@ -272,8 +245,7 @@ fn has_programming_syntax(input: &str) -> bool {
 
     // Reject member/property access (`nums.length`, `servers.length`)
     static MEMBER_ACCESS_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*")
-            .expect("valid member access regex")
+        Regex::new(r"[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*").expect("valid member access regex")
     });
 
     MEMBER_ACCESS_RE.is_match(input)
@@ -286,8 +258,8 @@ fn has_standalone_assignment(input: &str) -> bool {
             let prev = i.checked_sub(1).and_then(|p| bytes.get(p)).copied();
             let next = bytes.get(i + 1).copied();
 
-            let part_of_comparison = matches!(prev, Some(b'<' | b'>' | b'!' | b'='))
-                || matches!(next, Some(b'=' | b'>'));
+            let part_of_comparison =
+                matches!(prev, Some(b'<' | b'>' | b'!' | b'=')) || matches!(next, Some(b'=' | b'>'));
 
             if !part_of_comparison {
                 return true;
@@ -297,11 +269,7 @@ fn has_standalone_assignment(input: &str) -> bool {
     false
 }
 
-fn extract_plain_text_candidates(
-    segment: &str,
-    base_offset: usize,
-    candidates: &mut Vec<Candidate>,
-) {
+fn extract_plain_text_candidates(segment: &str, base_offset: usize, candidates: &mut Vec<Candidate>) {
     if segment.trim().is_empty() {
         return;
     }
@@ -316,16 +284,13 @@ fn extract_plain_text_candidates(
         let term = format!(r"-?\s*{atom}(?:\s*[*+\-/]\s*{atom})*");
         let ineq = r"(?:<=|>=|!=|<|>)";
 
-        let inequality_expr =
-            format!(r"{term}(?:\s*{ineq}\s*(?:{term}(?:\s*,\s*{term})+\s*{ineq}\s*)*{term})+");
+        let inequality_expr = format!(r"{term}(?:\s*{ineq}\s*(?:{term}(?:\s*,\s*{term})+\s*{ineq}\s*)*{term})+");
         let sup_atom = format!(r"[A-Za-z0-9]+{sup}");
-        let arithmetic_with_sup = format!(
-            r"(?:{atom}\s*[*+\-/]\s*)*{sup_atom}(?:\s*[*+\-/]\s*{atom})+|(?:{atom}\s*[*+\-/]\s*)+{sup_atom}"
-        );
+        let arithmetic_with_sup =
+            format!(r"(?:{atom}\s*[*+\-/]\s*)*{sup_atom}(?:\s*[*+\-/]\s*{atom})+|(?:{atom}\s*[*+\-/]\s*)+{sup_atom}");
         let multiplication_expr = format!(r"[0-9]+\s*\*\s*{atom}");
 
-        let pattern =
-            format!(r"{inequality_expr}|{arithmetic_with_sup}|{multiplication_expr}|{sup_atom}");
+        let pattern = format!(r"{inequality_expr}|{arithmetic_with_sup}|{multiplication_expr}|{sup_atom}");
         Regex::new(&pattern).expect("valid plain-text math regex")
     });
 
@@ -341,18 +306,12 @@ fn extract_plain_text_candidates(
         let end = start + trimmed.len();
         let clean_original = strip_zero_width(trimmed);
 
-        candidates.push(Candidate {
-            original: clean_original,
-            span: start..end,
-        });
+        candidates.push(Candidate { original: clean_original, span: start..end });
     }
 }
 
 pub(super) fn strip_zero_width(input: &str) -> String {
-    input
-        .chars()
-        .filter(|&ch| !matches!(ch, '\u{200b}' | '\u{200c}' | '\u{200d}' | '\u{feff}'))
-        .collect()
+    input.chars().filter(|&ch| !matches!(ch, '\u{200b}' | '\u{200c}' | '\u{200d}' | '\u{feff}')).collect()
 }
 
 #[cfg(test)]
@@ -367,14 +326,8 @@ mod tests {
         assert_eq!(
             candidates,
             vec![
-                Candidate {
-                    original: "i^{th}".into(),
-                    span: 11..19,
-                },
-                Candidate {
-                    original: "j^{th}".into(),
-                    span: 32..40,
-                },
+                Candidate { original: "i^{th}".into(), span: 11..19 },
+                Candidate { original: "j^{th}".into(), span: 32..40 },
             ]
         );
         assert_eq!(&markdown[candidates[0].span.clone()], "`i^{th}`");
@@ -383,15 +336,11 @@ mod tests {
 
     #[test]
     fn extracts_plain_text_superscripts_and_constraints() {
-        let markdown =
-            "The i^{th} server and j^{th} task with 2 * 10^{5} limit:\n- 1 <= n, m <= 2 * 10^{5}";
+        let markdown = "The i^{th} server and j^{th} task with 2 * 10^{5} limit:\n- 1 <= n, m <= 2 * 10^{5}";
         let candidates = extract_candidates(markdown);
 
         let originals: Vec<&str> = candidates.iter().map(|c| c.original.as_str()).collect();
-        assert_eq!(
-            originals,
-            vec!["i^{th}", "j^{th}", "2 * 10^{5}", "1 <= n, m <= 2 * 10^{5}"]
-        );
+        assert_eq!(originals, vec!["i^{th}", "j^{th}", "2 * 10^{5}", "1 <= n, m <= 2 * 10^{5}"]);
     }
 
     #[test]
@@ -445,8 +394,7 @@ assert 1 <= n <= 2 * 10^{5}
 
     #[test]
     fn ignores_markdown_links() {
-        let markdown =
-            "See [2410: Problem 10^{5}](https://leetcode.com/problems/test/) and `1 <= n`.";
+        let markdown = "See [2410: Problem 10^{5}](https://leetcode.com/problems/test/) and `1 <= n`.";
         let candidates = extract_candidates(markdown);
 
         assert_eq!(candidates.len(), 1);

@@ -6,8 +6,8 @@ use std::{
 };
 
 use leetnote::{
-    ExpressionTransformation, FmNormalizer, NormalizationError, NormalizationResponse,
-    StatementNormalizer, apply_transformations, extract_candidates,
+    ExpressionTransformation, FmNormalizer, NormalizationError, NormalizationResponse, StatementNormalizer,
+    apply_transformations, extract_candidates,
 };
 use tempfile::TempDir;
 
@@ -30,9 +30,7 @@ fi
 cat "$schema_file"
 "#;
     fs::write(&script_path, script).expect("write mock fm script");
-    let mut perms = fs::metadata(&script_path)
-        .expect("stat mock fm")
-        .permissions();
+    let mut perms = fs::metadata(&script_path).expect("stat mock fm").permissions();
     perms.set_mode(0o755);
     fs::set_permissions(&script_path, perms).expect("chmod mock fm");
     dir
@@ -56,8 +54,7 @@ fn read_recorded_prompt(prompt_path: &Path) -> Option<String> {
 
 #[test]
 fn schema_file_enforces_structured_expressions_contract() {
-    let schema_path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("schemas/statement-normalization.json");
+    let schema_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("schemas/statement-normalization.json");
     let content = fs::read_to_string(schema_path).unwrap();
     let schema: serde_json::Value = serde_json::from_str(&content).unwrap();
 
@@ -298,10 +295,7 @@ async fn rejects_fabricated_or_invalid_model_transformations() {
         });
         let (normalizer, _) = setup_mock_normalizer(&dir, &response.to_string());
         let err = normalizer.normalize(markdown).await.unwrap_err();
-        assert!(matches!(
-            err,
-            NormalizationError::DuplicateTransformation(_)
-        ));
+        assert!(matches!(err, NormalizationError::DuplicateTransformation(_)));
     }
 
     // 3. Missing inline math delimiters
@@ -317,10 +311,7 @@ async fn rejects_fabricated_or_invalid_model_transformations() {
         });
         let (normalizer, _) = setup_mock_normalizer(&dir, &response.to_string());
         let err = normalizer.normalize(markdown).await.unwrap_err();
-        assert!(matches!(
-            err,
-            NormalizationError::InvalidLatexDelimiters { .. }
-        ));
+        assert!(matches!(err, NormalizationError::InvalidLatexDelimiters { .. }));
     }
 
     // 4. Empty LaTeX content
@@ -365,15 +356,9 @@ fn deterministic_replacement_preserves_untransformed_candidates() {
 
     // Model converts `i^{th}` but excludes `1 <= n <= 2^{31} - 1`
     let response = NormalizationResponse {
-        expressions: vec![ExpressionTransformation {
-            original: "i^{th}".into(),
-            latex: "$i^{th}$".into(),
-        }],
+        expressions: vec![ExpressionTransformation { original: "i^{th}".into(), latex: "$i^{th}$".into() }],
     };
 
     let result = apply_transformations(markdown, &candidates, &response.expressions).unwrap();
-    assert_eq!(
-        result,
-        "Compare $i^{th}$ and `1 <= n <= 2^{31} - 1` in prose."
-    );
+    assert_eq!(result, "Compare $i^{th}$ and `1 <= n <= 2^{31} - 1` in prose.");
 }

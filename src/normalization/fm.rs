@@ -44,10 +44,7 @@ pub struct FmNormalizer {
 
 impl FmNormalizer {
     pub fn new(schema_path: impl Into<PathBuf>) -> Self {
-        Self {
-            executable: PathBuf::from("fm"),
-            schema_path: schema_path.into(),
-        }
+        Self { executable: PathBuf::from("fm"), schema_path: schema_path.into() }
     }
 
     pub fn with_executable(mut self, executable: impl Into<PathBuf>) -> Self {
@@ -63,10 +60,7 @@ impl FmNormalizer {
             .filter(|original| seen.insert(*original))
             .map(|original| format!("- {original:?}"))
             .collect();
-        let prompt = format!(
-            "Classify and convert the following candidate expressions:\n{}",
-            list.join("\n")
-        );
+        let prompt = format!("Classify and convert the following candidate expressions:\n{}", list.join("\n"));
 
         // ponytail: no timeout; fm can stall under load. Wrap in tokio::time::timeout if that bites.
         let output = Command::new(&self.executable)

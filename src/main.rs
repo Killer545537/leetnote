@@ -5,9 +5,7 @@ use chrono::Local;
 use clap::Parser;
 use leetnote::{
     FmNormalizer, LeetcodeClient, MarkdownConverter, NoteWriter,
-    pipeline::{
-        ConvertStatement, FetchProblem, NormalizeStatement, Pipeline, RenderNote, WriteNote,
-    },
+    pipeline::{ConvertStatement, FetchProblem, NormalizeStatement, Pipeline, RenderNote, WriteNote},
 };
 
 #[derive(Debug, Parser)]
@@ -24,8 +22,7 @@ struct Args {
 async fn main() -> Result<()> {
     let args = Args::parse();
 
-    let schema_path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("schemas/statement-normalization.json");
+    let schema_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("schemas/statement-normalization.json");
 
     let pipeline = Pipeline::new(FetchProblem::new(LeetcodeClient::new()?))
         .then(ConvertStatement::new(MarkdownConverter::new()))

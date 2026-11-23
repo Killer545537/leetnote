@@ -3,10 +3,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use chrono::NaiveDate;
 
-use crate::{
-    LeetcodeClient, MarkdownConverter, NoteRenderer, NoteWriter, Problem, StatementNormalizer,
-    extract_slug,
-};
+use crate::{LeetcodeClient, MarkdownConverter, NoteRenderer, NoteWriter, Problem, StatementNormalizer, extract_slug};
 
 #[allow(async_fn_in_trait)]
 pub trait Stage {
@@ -29,10 +26,7 @@ impl<S: Stage> Pipeline<S> {
     where
         N: Stage<Input = S::Output>,
     {
-        Pipeline::new(Then {
-            first: self.stages,
-            next,
-        })
+        Pipeline::new(Then { first: self.stages, next })
     }
 
     pub async fn run(&self, input: S::Input) -> Result<S::Output> {
@@ -85,10 +79,7 @@ impl Stage for FetchProblem {
 
     async fn run(&self, url: String) -> Result<Problem> {
         let slug = extract_slug(&url).context("Invalid LeetCode problem URL")?;
-        self.client
-            .fetch_problem(&slug)
-            .await
-            .context("Failed to fetch problem")
+        self.client.fetch_problem(&slug).await.context("Failed to fetch problem")
     }
 }
 
@@ -107,10 +98,8 @@ impl Stage for ConvertStatement {
     type Output = Statement;
 
     async fn run(&self, problem: Problem) -> Result<Statement> {
-        let markdown = self
-            .converter
-            .convert(&problem.content)
-            .context("Failed to convert problem statement to Markdown")?;
+        let markdown =
+            self.converter.convert(&problem.content).context("Failed to convert problem statement to Markdown")?;
         Ok(Statement { problem, markdown })
     }
 }
@@ -135,10 +124,7 @@ impl<N: StatementNormalizer> Stage for NormalizeStatement<N> {
             .normalize(&statement.markdown)
             .await
             .context("Failed to normalize mathematical expressions")?;
-        Ok(Statement {
-            problem: statement.problem,
-            markdown,
-        })
+        Ok(Statement { problem: statement.problem, markdown })
     }
 }
 
@@ -159,10 +145,7 @@ impl Stage for RenderNote {
     async fn run(&self, statement: Statement) -> Result<RenderedNote> {
         let content = NoteRenderer::render(&statement.problem, &statement.markdown, self.created)
             .context("Failed to render Obsidian note")?;
-        Ok(RenderedNote {
-            problem: statement.problem,
-            content,
-        })
+        Ok(RenderedNote { problem: statement.problem, content })
     }
 }
 
@@ -181,8 +164,6 @@ impl Stage for WriteNote {
     type Output = PathBuf;
 
     async fn run(&self, note: RenderedNote) -> Result<PathBuf> {
-        self.writer
-            .write(&note.problem, &note.content)
-            .context("Failed to write Obsidian note")
+        self.writer.write(&note.problem, &note.content).context("Failed to write Obsidian note")
     }
 }

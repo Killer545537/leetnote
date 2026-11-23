@@ -70,19 +70,12 @@ impl LeetcodeClient {
         if let Some(errors) = result.errors
             && !errors.is_empty()
         {
-            let messages = errors
-                .into_iter()
-                .map(|error| error.message)
-                .collect::<Vec<_>>()
-                .join("; ");
+            let messages = errors.into_iter().map(|error| error.message).collect::<Vec<_>>().join("; ");
             return Err(LeetcodeError::GraphQL(messages));
         }
 
-        let data = result
-            .data
-            .ok_or_else(|| LeetcodeError::UnexpectedResponse("Missing GraphQL data".into()))?;
+        let data = result.data.ok_or_else(|| LeetcodeError::UnexpectedResponse("Missing GraphQL data".into()))?;
 
-        data.question
-            .ok_or_else(|| LeetcodeError::ProblemNotFound(slug.to_owned()))
+        data.question.ok_or_else(|| LeetcodeError::ProblemNotFound(slug.to_owned()))
     }
 }

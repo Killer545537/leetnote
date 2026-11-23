@@ -37,43 +37,28 @@ pub fn validate_transformations(
             || !markdown.is_char_boundary(start)
             || !markdown.is_char_boundary(end)
         {
-            return Err(NormalizationError::InvalidCandidateSpan {
-                original: candidate.original.clone(),
-                start,
-                end,
-            });
+            return Err(NormalizationError::InvalidCandidateSpan { original: candidate.original.clone(), start, end });
         }
 
         let slice = &markdown[start..end];
         if !matches_source_slice(slice, &candidate.original) {
-            return Err(NormalizationError::InvalidCandidateSpan {
-                original: candidate.original.clone(),
-                start,
-                end,
-            });
+            return Err(NormalizationError::InvalidCandidateSpan { original: candidate.original.clone(), start, end });
         }
 
         prev_end = end;
     }
 
-    let valid_originals: HashSet<&str> = candidates
-        .iter()
-        .map(|candidate| candidate.original.as_str())
-        .collect();
+    let valid_originals: HashSet<&str> = candidates.iter().map(|candidate| candidate.original.as_str()).collect();
 
     let mut seen_originals: HashSet<&str> = HashSet::with_capacity(transformations.len());
 
     for transformation in transformations {
         if !valid_originals.contains(transformation.original.as_str()) {
-            return Err(NormalizationError::UnknownCandidate(
-                transformation.original.clone(),
-            ));
+            return Err(NormalizationError::UnknownCandidate(transformation.original.clone()));
         }
 
         if !seen_originals.insert(transformation.original.as_str()) {
-            return Err(NormalizationError::DuplicateTransformation(
-                transformation.original.clone(),
-            ));
+            return Err(NormalizationError::DuplicateTransformation(transformation.original.clone()));
         }
 
         validate_latex(&transformation.original, &transformation.latex)?;
@@ -93,10 +78,8 @@ pub fn apply_transformations(
         return Ok(markdown.to_owned());
     }
 
-    let lookup: HashMap<&str, &str> = transformations
-        .iter()
-        .map(|item| (item.original.as_str(), item.latex.as_str()))
-        .collect();
+    let lookup: HashMap<&str, &str> =
+        transformations.iter().map(|item| (item.original.as_str(), item.latex.as_str())).collect();
 
     let mut output = String::with_capacity(markdown.len());
     let mut cursor = 0usize;
@@ -136,16 +119,10 @@ fn matches_source_slice(slice: &str, expected_original: &str) -> bool {
 
 fn validate_latex(original: &str, latex: &str) -> Result<()> {
     if latex.trim().is_empty() || latex.trim() == "$$" {
-        return Err(NormalizationError::EmptyLatex {
-            original: original.to_owned(),
-        });
+        return Err(NormalizationError::EmptyLatex { original: original.to_owned() });
     }
 
-    if !latex.starts_with('$')
-        || !latex.ends_with('$')
-        || latex.starts_with("$$")
-        || latex.ends_with("$$")
-    {
+    if !latex.starts_with('$') || !latex.ends_with('$') || latex.starts_with("$$") || latex.ends_with("$$") {
         return Err(NormalizationError::InvalidLatexDelimiters {
             original: original.to_owned(),
             latex: latex.to_owned(),
@@ -154,9 +131,7 @@ fn validate_latex(original: &str, latex: &str) -> Result<()> {
 
     let inner = &latex[1..latex.len() - 1];
     if inner.trim().is_empty() {
-        return Err(NormalizationError::EmptyLatex {
-            original: original.to_owned(),
-        });
+        return Err(NormalizationError::EmptyLatex { original: original.to_owned() });
     }
 
     if inner.contains(['$', '\n', '\r']) {
@@ -179,31 +154,19 @@ mod tests {
         let markdown = "The `i^{th}` server handles `2 * 10^{5}` tasks.";
         let candidates = extract_candidates(markdown);
         let transformations = vec![
-            ExpressionTransformation {
-                original: "i^{th}".into(),
-                latex: "$i^{th}$".into(),
-            },
-            ExpressionTransformation {
-                original: "2 * 10^{5}".into(),
-                latex: r"$2 \times 10^{5}$".into(),
-            },
+            ExpressionTransformation { original: "i^{th}".into(), latex: "$i^{th}$".into() },
+            ExpressionTransformation { original: "2 * 10^{5}".into(), latex: r"$2 \times 10^{5}$".into() },
         ];
 
         let normalized = apply_transformations(markdown, &candidates, &transformations).unwrap();
-        assert_eq!(
-            normalized,
-            r"The $i^{th}$ server handles $2 \times 10^{5}$ tasks."
-        );
+        assert_eq!(normalized, r"The $i^{th}$ server handles $2 \times 10^{5}$ tasks.");
     }
 
     #[test]
     fn rejects_unknown_candidate() {
         let markdown = "The `i^{th}` server.";
         let candidates = extract_candidates(markdown);
-        let transformations = vec![ExpressionTransformation {
-            original: "j^{th}".into(),
-            latex: "$j^{th}$".into(),
-        }];
+        let transformations = vec![ExpressionTransformation { original: "j^{th}".into(), latex: "$j^{th}$".into() }];
 
         let err = apply_transformations(markdown, &candidates, &transformations).unwrap_err();
         assert!(matches!(err, NormalizationError::UnknownCandidate(ref s) if s == "j^{th}"));
@@ -214,14 +177,8 @@ mod tests {
         let markdown = "The `i^{th}` server.";
         let candidates = extract_candidates(markdown);
         let transformations = vec![
-            ExpressionTransformation {
-                original: "i^{th}".into(),
-                latex: "$i^{th}$".into(),
-            },
-            ExpressionTransformation {
-                original: "i^{th}".into(),
-                latex: "$i^{th}$".into(),
-            },
+            ExpressionTransformation { original: "i^{th}".into(), latex: "$i^{th}$".into() },
+            ExpressionTransformation { original: "i^{th}".into(), latex: "$i^{th}$".into() },
         ];
 
         let err = apply_transformations(markdown, &candidates, &transformations).unwrap_err();
@@ -234,10 +191,7 @@ mod tests {
         let candidates = extract_candidates(markdown);
 
         for empty in ["", "   ", "$$", "$   $"] {
-            let transformations = vec![ExpressionTransformation {
-                original: "i^{th}".into(),
-                latex: empty.into(),
-            }];
+            let transformations = vec![ExpressionTransformation { original: "i^{th}".into(), latex: empty.into() }];
             let err = apply_transformations(markdown, &candidates, &transformations).unwrap_err();
             assert!(matches!(err, NormalizationError::EmptyLatex { .. }));
         }
@@ -248,42 +202,20 @@ mod tests {
         let markdown = "The `i^{th}` server.";
         let candidates = extract_candidates(markdown);
 
-        for invalid in [
-            "i^{th}",
-            "$$i^{th}$$",
-            "$i^{th}",
-            "i^{th}$",
-            "$i^{th}$ injected $x$",
-            "$i^{th}\n$",
-        ] {
-            let transformations = vec![ExpressionTransformation {
-                original: "i^{th}".into(),
-                latex: invalid.into(),
-            }];
+        for invalid in ["i^{th}", "$$i^{th}$$", "$i^{th}", "i^{th}$", "$i^{th}$ injected $x$", "$i^{th}\n$"] {
+            let transformations = vec![ExpressionTransformation { original: "i^{th}".into(), latex: invalid.into() }];
             let err = apply_transformations(markdown, &candidates, &transformations).unwrap_err();
-            assert!(matches!(
-                err,
-                NormalizationError::InvalidLatexDelimiters { .. }
-            ));
+            assert!(matches!(err, NormalizationError::InvalidLatexDelimiters { .. }));
         }
     }
 
     #[test]
     fn rejects_mismatched_candidate_span() {
         let markdown = "The `i^{th}` server.";
-        let bogus_candidates = vec![Candidate {
-            original: "i^{th}".into(),
-            span: 0..3,
-        }];
-        let transformations = vec![ExpressionTransformation {
-            original: "i^{th}".into(),
-            latex: "$i^{th}$".into(),
-        }];
+        let bogus_candidates = vec![Candidate { original: "i^{th}".into(), span: 0..3 }];
+        let transformations = vec![ExpressionTransformation { original: "i^{th}".into(), latex: "$i^{th}$".into() }];
 
         let err = apply_transformations(markdown, &bogus_candidates, &transformations).unwrap_err();
-        assert!(matches!(
-            err,
-            NormalizationError::InvalidCandidateSpan { .. }
-        ));
+        assert!(matches!(err, NormalizationError::InvalidCandidateSpan { .. }));
     }
 }

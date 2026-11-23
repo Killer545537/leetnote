@@ -8,10 +8,7 @@ pub enum NormalizationError {
     Io(#[from] io::Error),
 
     #[error("Foundation Models exited unsuccessfully ({status:?}): {stderr}")]
-    ProcessFailed {
-        status: std::process::ExitStatus,
-        stderr: String,
-    },
+    ProcessFailed { status: std::process::ExitStatus, stderr: String },
 
     #[error("Invalid response from Foundation Models")]
     InvalidResponse(#[from] serde_json::Error),
@@ -29,11 +26,7 @@ pub enum NormalizationError {
     InvalidLatexDelimiters { original: String, latex: String },
 
     #[error("Candidate '{original}' does not match source span {start}..{end}")]
-    InvalidCandidateSpan {
-        original: String,
-        start: usize,
-        end: usize,
-    },
+    InvalidCandidateSpan { original: String, start: usize, end: usize },
 }
 
 pub type Result<T> = std::result::Result<T, NormalizationError>;

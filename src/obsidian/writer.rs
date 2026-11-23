@@ -13,20 +13,14 @@ pub struct NoteWriter {
 
 impl NoteWriter {
     pub fn new(directory: impl Into<PathBuf>) -> Self {
-        Self {
-            directory: directory.into(),
-        }
+        Self { directory: directory.into() }
     }
 
     pub fn write(&self, problem: &Problem, content: &str) -> Result<PathBuf> {
-        fs::create_dir_all(&self.directory).map_err(|source| ObsidianError::Io {
-            path: self.directory.clone(),
-            source,
-        })?;
+        fs::create_dir_all(&self.directory)
+            .map_err(|source| ObsidianError::Io { path: self.directory.clone(), source })?;
 
-        let path = self
-            .directory
-            .join(format!("{}.md", Self::sanitize_filename(&problem.title)));
+        let path = self.directory.join(format!("{}.md", Self::sanitize_filename(&problem.title)));
 
         let mut file = match OpenOptions::new().write(true).create_new(true).open(&path) {
             Ok(file) => file,
@@ -50,12 +44,7 @@ impl NoteWriter {
         let sanitized: String = input
             .chars()
             .map(|character| {
-                if character.is_control()
-                    || matches!(
-                        character,
-                        '/' | '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*'
-                    )
-                {
+                if character.is_control() || matches!(character, '/' | '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*') {
                     ' '
                 } else {
                     character
@@ -63,11 +52,6 @@ impl NoteWriter {
             })
             .collect();
 
-        sanitized
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ")
-            .trim_matches([' ', '.'])
-            .to_owned()
+        sanitized.split_whitespace().collect::<Vec<_>>().join(" ").trim_matches([' ', '.']).to_owned()
     }
 }

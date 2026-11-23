@@ -3,12 +3,9 @@ use std::cell::RefCell;
 use anyhow::{Result, bail};
 use chrono::NaiveDate;
 use leetnote::{
-    Difficulty, ExpressionTransformation, LeetcodeClient, MarkdownConverter, NormalizationError,
-    NoteWriter, ObsidianError, Problem, StatementNormalizer, apply_transformations,
-    extract_candidates,
-    pipeline::{
-        ConvertStatement, FetchProblem, NormalizeStatement, Pipeline, RenderNote, Stage, WriteNote,
-    },
+    Difficulty, ExpressionTransformation, LeetcodeClient, MarkdownConverter, NormalizationError, NoteWriter,
+    ObsidianError, Problem, StatementNormalizer, apply_transformations, extract_candidates,
+    pipeline::{ConvertStatement, FetchProblem, NormalizeStatement, Pipeline, RenderNote, Stage, WriteNote},
 };
 
 struct Record<'a> {
@@ -34,31 +31,17 @@ impl Stage for Record<'_> {
 #[tokio::test]
 async fn executes_stages_in_order_and_passes_outputs_forward() {
     let events = RefCell::new(Vec::new());
-    let stage = |name| Record {
-        name,
-        events: &events,
-        fail: false,
-    };
-    let pipeline = Pipeline::new(stage("first"))
-        .then(stage("second"))
-        .then(stage("third"));
+    let stage = |name| Record { name, events: &events, fail: false };
+    let pipeline = Pipeline::new(stage("first")).then(stage("second")).then(stage("third"));
 
-    assert_eq!(
-        pipeline.run(String::new()).await.unwrap(),
-        "firstsecondthird"
-    );
+    assert_eq!(pipeline.run(String::new()).await.unwrap(), "firstsecondthird");
     assert_eq!(*events.borrow(), ["first", "second", "third"]);
 }
 
 #[tokio::test]
 async fn stops_at_the_first_failed_stage() {
     let events = RefCell::new(Vec::new());
-    let pipeline = Pipeline::new(Record {
-        name: "first",
-        events: &events,
-        fail: true,
-    })
-    .then(Record {
+    let pipeline = Pipeline::new(Record { name: "first", events: &events, fail: true }).then(Record {
         name: "second",
         events: &events,
         fail: false,
@@ -81,10 +64,7 @@ impl StatementNormalizer for MockNormalizer {
         apply_transformations(
             markdown,
             &extract_candidates(markdown),
-            &[ExpressionTransformation {
-                original: "i^{th}".into(),
-                latex: "$i^{th}$".into(),
-            }],
+            &[ExpressionTransformation { original: "i^{th}".into(), latex: "$i^{th}$".into() }],
         )
     }
 }
@@ -105,9 +85,7 @@ async fn converts_normalizes_renders_and_writes_a_note() {
     let directory = tempfile::tempdir().unwrap();
     let pipeline = Pipeline::new(ConvertStatement::new(MarkdownConverter::new()))
         .then(NormalizeStatement::new(MockNormalizer { fail: false }))
-        .then(RenderNote::new(
-            NaiveDate::from_ymd_opt(2026, 11, 14).unwrap(),
-        ))
+        .then(RenderNote::new(NaiveDate::from_ymd_opt(2026, 11, 14).unwrap()))
         .then(WriteNote::new(NoteWriter::new(directory.path())));
 
     let path = pipeline.run(problem()).await.unwrap();
@@ -120,10 +98,7 @@ async fn converts_normalizes_renders_and_writes_a_note() {
     assert!(content.contains("## Observations"));
 
     let error = pipeline.run(problem()).await.unwrap_err();
-    assert!(matches!(
-        error.downcast_ref::<ObsidianError>(),
-        Some(ObsidianError::AlreadyExists(_))
-    ));
+    assert!(matches!(error.downcast_ref::<ObsidianError>(), Some(ObsidianError::AlreadyExists(_))));
     assert_eq!(std::fs::read_to_string(path).unwrap(), content);
 }
 
@@ -133,30 +108,19 @@ async fn normalization_failure_prevents_writing_and_preserves_the_error_source()
     let output = directory.path().join("notes");
     let pipeline = Pipeline::new(ConvertStatement::new(MarkdownConverter::new()))
         .then(NormalizeStatement::new(MockNormalizer { fail: true }))
-        .then(RenderNote::new(
-            NaiveDate::from_ymd_opt(2026, 11, 14).unwrap(),
-        ))
+        .then(RenderNote::new(NaiveDate::from_ymd_opt(2026, 11, 14).unwrap()))
         .then(WriteNote::new(NoteWriter::new(&output)));
 
     let error = pipeline.run(problem()).await.unwrap_err();
-    assert_eq!(
-        error.to_string(),
-        "Failed to normalize mathematical expressions"
-    );
-    assert!(matches!(
-        error.downcast_ref::<NormalizationError>(),
-        Some(NormalizationError::UnknownCandidate(_))
-    ));
+    assert_eq!(error.to_string(), "Failed to normalize mathematical expressions");
+    assert!(matches!(error.downcast_ref::<NormalizationError>(), Some(NormalizationError::UnknownCandidate(_))));
     assert!(!output.exists());
 }
 
 #[tokio::test]
 async fn fetch_stage_rejects_invalid_urls_before_network_access() {
     let pipeline = Pipeline::new(FetchProblem::new(LeetcodeClient::new().unwrap()));
-    let error = pipeline
-        .run("https://example.com/problems/two-sum/".into())
-        .await
-        .unwrap_err();
+    let error = pipeline.run("https://example.com/problems/two-sum/".into()).await.unwrap_err();
 
     assert_eq!(error.to_string(), "Invalid LeetCode problem URL");
 }

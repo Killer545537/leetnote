@@ -9,10 +9,7 @@ fn sample_problem() -> Problem {
         title_slug: "assign-cookies".into(),
         difficulty: Difficulty::Easy,
         content: String::new(),
-        topic_tags: vec![TopicTag {
-            name: "Greedy".into(),
-            slug: "greedy".into(),
-        }],
+        topic_tags: vec![TopicTag { name: "Greedy".into(), slug: "greedy".into() }],
     }
 }
 
@@ -41,10 +38,7 @@ fn refuses_to_overwrite_existing_note() {
 
     assert!(matches!(result, Err(ObsidianError::AlreadyExists(_))));
 
-    assert_eq!(
-        fs::read_to_string(existing_path).unwrap(),
-        "My handwritten notes"
-    );
+    assert_eq!(fs::read_to_string(existing_path).unwrap(), "My handwritten notes");
 }
 
 #[test]
@@ -54,9 +48,7 @@ fn creates_missing_directory() {
 
     let writer = NoteWriter::new(&output);
 
-    let path = writer
-        .write(&sample_problem(), "Problem statement")
-        .unwrap();
+    let path = writer.write(&sample_problem(), "Problem statement").unwrap();
 
     assert!(path.exists());
 }
