@@ -1,5 +1,5 @@
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
 use crate::leetcode::models::Problem;
@@ -22,6 +22,7 @@ const QUESTION_QUERY: &str = r#"
         }
     }
 "#;
+const DAILY_QUERY: &str = "query { activeDailyCodingChallengeQuestion { link } }";
 
 #[derive(Debug, Deserialize)]
 struct GraphQlResponse<T> {
@@ -40,6 +41,17 @@ struct QuestionData {
     question: Option<Value>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DailyData {
+    active_daily_coding_challenge_question: DailyQuestion,
+}
+
+#[derive(Debug, Deserialize)]
+struct DailyQuestion {
+    link: String,
+}
+
 pub struct LeetcodeClient {
     client: Client,
 }
@@ -52,21 +64,28 @@ impl LeetcodeClient {
     }
 
     pub async fn fetch_problem(&self, slug: &str) -> Result<Problem> {
+        let data: QuestionData = self.query(QUESTION_QUERY, json!({ "titleSlug": slug })).await?;
+        let question = data.question.ok_or_else(|| LeetcodeError::ProblemNotFound(slug.to_owned()))?;
+        parse_question(question, slug)
+    }
+
+    /// URL of today's daily challenge, e.g. `https://leetcode.com/problems/two-sum/`.
+    pub async fn daily_problem_url(&self) -> Result<String> {
+        let data: DailyData = self.query(DAILY_QUERY, json!({})).await?;
+        Ok(format!("https://leetcode.com{}", data.active_daily_coding_challenge_question.link))
+    }
+
+    async fn query<T: DeserializeOwned>(&self, query: &str, variables: Value) -> Result<T> {
         let response = self
             .client
             .post(GRAPHQL_ENDPOINT)
             .header("Referer", "https://leetcode.com/")
-            .json(&json!({
-                "query": QUESTION_QUERY,
-                "variables": {
-                    "titleSlug": slug
-                }
-            }))
+            .json(&json!({ "query": query, "variables": variables }))
             .send()
             .await?
             .error_for_status()?;
 
-        let result: GraphQlResponse<QuestionData> = response.json().await?;
+        let result: GraphQlResponse<T> = response.json().await?;
 
         if let Some(errors) = result.errors
             && !errors.is_empty()
@@ -75,10 +94,7 @@ impl LeetcodeClient {
             return Err(LeetcodeError::GraphQL(messages));
         }
 
-        let data = result.data.ok_or_else(|| LeetcodeError::UnexpectedResponse("Missing GraphQL data".into()))?;
-
-        let question = data.question.ok_or_else(|| LeetcodeError::ProblemNotFound(slug.to_owned()))?;
-        parse_question(question, slug)
+        result.data.ok_or_else(|| LeetcodeError::UnexpectedResponse("Missing GraphQL data".into()))
     }
 }
 
@@ -105,5 +121,12 @@ mod tests {
         let mut free = question;
         free["content"] = json!("<p>Statement</p>");
         assert_eq!(parse_question(free, "meeting-rooms").unwrap().content, "<p>Statement</p>");
+    }
+
+    #[test]
+    fn daily_response_yields_the_problem_link() {
+        let body = r#"{"data":{"activeDailyCodingChallengeQuestion":{"link":"/problems/two-sum/"}}}"#;
+        let response: GraphQlResponse<DailyData> = serde_json::from_str(body).unwrap();
+        assert_eq!(response.data.unwrap().active_daily_coding_challenge_question.link, "/problems/two-sum/");
     }
 }

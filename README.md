@@ -26,11 +26,13 @@ Characters that are not allowed in filenames (such as `/ \ : ? * " < > |`) are r
 
 ```sh
 leetnote <URL> --output-dir <DIR>
+leetnote --daily --output-dir <DIR>
 ```
 
 | Argument                 | Description                                  |
 | ------------------------ | -------------------------------------------- |
 | `<URL>`                  | A `https://leetcode.com/problems/...` URL    |
+| `--daily`                | Use today's daily challenge instead of a URL |
 | `-o`, `--output-dir <DIR>` | Directory where the note will be created. Defaults to `$LEETNOTE_DIR` |
 | `--no-normalize`         | Skip the LaTeX conversion (no `fm` call)     |
 
@@ -51,6 +53,7 @@ To skip `-o` every time, set a default directory in your shell profile. An expli
 ```sh
 export LEETNOTE_DIR="$HOME/Documents/Obsidian Vault/Leetcode"
 leetnote "https://leetcode.com/problems/assign-cookies/"
+leetnote --daily
 ```
 
 Quote the URL (it often contains `&`). Quote the directory if it contains spaces, but don't also escape the spaces with backslashes, or the backslashes become part of the path.
