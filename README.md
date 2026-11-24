@@ -22,6 +22,27 @@ The note contains:
 
 Characters that are not allowed in filenames (such as `/ \ : ? * " < > |`) are replaced with spaces.
 
+## Requirements
+
+- **To run:** macOS on Apple silicon for the prebuilt binary. Other platforms can build from source.
+- **For LaTeX math (optional):** Apple's `fm` CLI, which ships with macOS 27 at `/usr/bin/fm`. It runs the on-device model, so it needs no network or API key, but Apple Intelligence must be available on the Mac.
+  - Accept the model license once: `sudo fm license`. Check it with `fm license --status`.
+  - Check that the model is ready: `fm models` should show `✓ system`.
+  - Without `fm`, or with `--no-normalize`, notes are still written; the math just stays as LeetCode wrote it.
+
+## Install
+
+Download `leetnote-<version>-aarch64-apple-darwin.tar.gz` from the [latest release](https://github.com/Killer545537/leetnote/releases/latest), then:
+
+```sh
+tar -xzf leetnote-*-aarch64-apple-darwin.tar.gz
+sudo mv leetnote /usr/local/bin/
+```
+
+The binary isn't notarized, so if macOS refuses to open it, clear the quarantine flag: `xattr -c /usr/local/bin/leetnote`.
+
+Or build from source (see [Build](#build)).
+
 ## Usage
 
 ```sh
