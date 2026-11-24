@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # macos-latest is Apple silicon, the platform `fm` runs on.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false # `gh` gets its token from GH_TOKEN below
+      # No rust-cache here: a job that can publish releases shouldn't restore build artifacts
+      # another workflow may have written, and releases are rare enough to build from scratch.
+      - run: rustup toolchain install
+
+      - name: Check the tag matches Cargo.toml
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match Cargo.toml version $version"
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - run: cargo test --all-targets --locked
+      - run: cargo build --release --locked
+
+      - name: Package
+        run: |
+          archive="leetnote-$VERSION-aarch64-apple-darwin.tar.gz"
+          strip target/release/leetnote
+          tar -czf "$archive" -C target/release leetnote
+          shasum -a 256 "$archive" > "$archive.sha256"
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "leetnote $VERSION" --generate-notes \
+            "$ARCHIVE" "$ARCHIVE.sha256"

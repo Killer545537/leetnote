@@ -96,3 +96,14 @@ cargo build --release
 ```
 
 The binary is written to `target/release/leetnote`.
+
+## Release
+
+Bump `version` in `Cargo.toml`, push the change to `dev`, then tag that commit and push the tag:
+
+```sh
+git tag v0.2.0 dev
+git push origin v0.2.0
+```
+
+The [Release workflow](.github/workflows/release.yml) checks that the tag matches `Cargo.toml`, runs the tests, and publishes a GitHub release with the Apple-silicon binary and its SHA-256 checksum.
