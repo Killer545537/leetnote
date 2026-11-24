@@ -19,12 +19,6 @@ pub enum NormalizationError {
     #[error("Candidate transformed more than once: {0}")]
     DuplicateTransformation(String),
 
-    #[error("Empty LaTeX output for candidate: {original}")]
-    EmptyLatex { original: String },
-
-    #[error("LaTeX output must be wrapped in inline $...$ delimiters for {original}: {latex}")]
-    InvalidLatexDelimiters { original: String, latex: String },
-
     #[error("Candidate '{original}' does not match source span {start}..{end}")]
     InvalidCandidateSpan { original: String, start: usize, end: usize },
 }

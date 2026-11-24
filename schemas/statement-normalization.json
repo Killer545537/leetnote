@@ -11,19 +11,20 @@
                         "type": "string",
                         "description": "The exact candidate expression from the input list"
                     },
-                    "latex": {
+                    "kind": {
                         "type": "string",
-                        "description": "The normalized inline LaTeX expression wrapped in $...$"
+                        "enum": ["math", "mixed", "code"],
+                        "description": "math: only math notation; mixed: math that mentions code values; code: program code"
                     }
                 },
                 "required": [
                     "original",
-                    "latex"
+                    "kind"
                 ],
                 "additionalProperties": false,
                 "x-order": [
                     "original",
-                    "latex"
+                    "kind"
                 ]
             }
         }

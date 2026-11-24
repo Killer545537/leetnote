@@ -9,7 +9,7 @@ Given a problem URL, `leetnote` fetches the problem from LeetCode, converts the 
 1. Extracts the problem slug from the URL (query parameters and a trailing `/description/` are ignored).
 2. Fetches the problem's ID, title, difficulty, tags and statement from LeetCode.
 3. Converts the HTML statement to Markdown.
-4. Converts math such as `1 <= n <= 2 * 10^{5}` to LaTeX (`$1 \leq n \leq 2 \times 10^{5}$`) with Apple's on-device model through the `fm` CLI (macOS 27+). If `fm` is missing or fails, the note is still written with the math as LeetCode wrote it, and a warning is printed.
+4. Converts math such as `0 <= nums[i] <= 10^{9}` to LaTeX (`$0 \leq \mathtt{nums[i]} \leq 10^{9}$`). Apple's on-device model, through the `fm` CLI (macOS 27+), only decides which spans are math; the conversion itself is done by fixed rules, so numbers can't be altered. If `fm` is missing or fails, the note is still written with the math as LeetCode wrote it, and a warning is printed.
 5. Writes `<Problem Title>.md` to the output directory, creating the directory if it does not exist.
 
 The note contains:

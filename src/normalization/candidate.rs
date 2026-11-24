@@ -236,19 +236,10 @@ fn is_inline_code_math_candidate(inner: &str) -> bool {
     SUPERSCRIPT_RE.is_match(inner) || INEQUALITY_RE.is_match(inner) || MULTIPLICATION_RE.is_match(inner)
 }
 
+/// Statements (`nums = [1, 2, 3]`, `x++;`) are never math. Indexing and member access (`nums[i]`,
+/// `nums.length`) are left to the model, since `0 <= nums[i] <= 10^9` is a constraint worth converting.
 fn has_programming_syntax(input: &str) -> bool {
-    // Reject array indexing/literals (`nums[i]`, `servers[i]`, `nums = [1, 2, 3]`)
-    // and statements ending with `;`
-    if input.contains(['[', ']', ';']) || has_standalone_assignment(input) {
-        return true;
-    }
-
-    // Reject member/property access (`nums.length`, `servers.length`)
-    static MEMBER_ACCESS_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*").expect("valid member access regex")
-    });
-
-    MEMBER_ACCESS_RE.is_match(input)
+    input.contains(';') || has_standalone_assignment(input)
 }
 
 fn has_standalone_assignment(input: &str) -> bool {
@@ -344,16 +335,16 @@ mod tests {
     }
 
     #[test]
-    fn ignores_programming_expressions_and_indexed_constraints() {
+    fn ignores_plain_code_but_keeps_indexed_constraints() {
         let markdown = "\
-Use `servers[i]`, `tasks[j]`, `nums.length`, `ans[j]`, and `nums = [1, 2, 3]`.
+Use `servers[i]`, `tasks[j]`, `nums.length`, `ans[j]`, `nums = [1, 2, 3]` and `x = a * b;`.
 Constraints:
 * `1 <= nums.length <= 100`
-* `1 <= l <= r <= nums.length`
 * `-1000 <= nums[i] <= 1000`";
         let candidates = extract_candidates(markdown);
 
-        assert!(candidates.is_empty());
+        let originals: Vec<&str> = candidates.iter().map(|c| c.original.as_str()).collect();
+        assert_eq!(originals, ["1 <= nums.length <= 100", "-1000 <= nums[i] <= 1000"]);
     }
 
     #[test]

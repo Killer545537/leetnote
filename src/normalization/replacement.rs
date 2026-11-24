@@ -14,10 +14,26 @@ pub struct ExpressionTransformation {
     pub latex: String,
 }
 
+/// The model's verdict for one candidate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ClassifiedExpression {
+    pub original: String,
+    pub kind: ExpressionKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExpressionKind {
+    Math,
+    Mixed,
+    Code,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct NormalizationResponse {
-    pub expressions: Vec<ExpressionTransformation>,
+    pub expressions: Vec<ClassifiedExpression>,
 }
 
 pub fn validate_transformations(
@@ -60,8 +76,6 @@ pub fn validate_transformations(
         if !seen_originals.insert(transformation.original.as_str()) {
             return Err(NormalizationError::DuplicateTransformation(transformation.original.clone()));
         }
-
-        validate_latex(&transformation.original, &transformation.latex)?;
     }
 
     Ok(())
@@ -117,33 +131,6 @@ fn matches_source_slice(slice: &str, expected_original: &str) -> bool {
     strip_zero_width(inner) == expected_original
 }
 
-fn validate_latex(original: &str, latex: &str) -> Result<()> {
-    if latex.trim().is_empty() || latex.trim() == "$$" {
-        return Err(NormalizationError::EmptyLatex { original: original.to_owned() });
-    }
-
-    if !latex.starts_with('$') || !latex.ends_with('$') || latex.starts_with("$$") || latex.ends_with("$$") {
-        return Err(NormalizationError::InvalidLatexDelimiters {
-            original: original.to_owned(),
-            latex: latex.to_owned(),
-        });
-    }
-
-    let inner = &latex[1..latex.len() - 1];
-    if inner.trim().is_empty() {
-        return Err(NormalizationError::EmptyLatex { original: original.to_owned() });
-    }
-
-    if inner.contains(['$', '\n', '\r']) {
-        return Err(NormalizationError::InvalidLatexDelimiters {
-            original: original.to_owned(),
-            latex: latex.to_owned(),
-        });
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -183,30 +170,6 @@ mod tests {
 
         let err = apply_transformations(markdown, &candidates, &transformations).unwrap_err();
         assert!(matches!(err, NormalizationError::DuplicateTransformation(ref s) if s == "i^{th}"));
-    }
-
-    #[test]
-    fn rejects_empty_latex() {
-        let markdown = "The `i^{th}` server.";
-        let candidates = extract_candidates(markdown);
-
-        for empty in ["", "   ", "$$", "$   $"] {
-            let transformations = vec![ExpressionTransformation { original: "i^{th}".into(), latex: empty.into() }];
-            let err = apply_transformations(markdown, &candidates, &transformations).unwrap_err();
-            assert!(matches!(err, NormalizationError::EmptyLatex { .. }));
-        }
-    }
-
-    #[test]
-    fn rejects_invalid_latex_delimiters() {
-        let markdown = "The `i^{th}` server.";
-        let candidates = extract_candidates(markdown);
-
-        for invalid in ["i^{th}", "$$i^{th}$$", "$i^{th}", "i^{th}$", "$i^{th}$ injected $x$", "$i^{th}\n$"] {
-            let transformations = vec![ExpressionTransformation { original: "i^{th}".into(), latex: invalid.into() }];
-            let err = apply_transformations(markdown, &candidates, &transformations).unwrap_err();
-            assert!(matches!(err, NormalizationError::InvalidLatexDelimiters { .. }));
-        }
     }
 
     #[test]

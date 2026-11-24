@@ -6,8 +6,8 @@ use std::{
 };
 
 use leetnote::{
-    ExpressionTransformation, FmNormalizer, NormalizationError, NormalizationResponse, StatementNormalizer,
-    apply_transformations, extract_candidates,
+    ExpressionTransformation, FmNormalizer, NormalizationError, StatementNormalizer, apply_transformations,
+    extract_candidates,
 };
 use tempfile::TempDir;
 
@@ -63,9 +63,9 @@ fn schema_file_enforces_structured_expressions_contract() {
     let items = &schema["properties"]["expressions"]["items"];
     assert_eq!(items["type"], "object");
     assert_eq!(items["additionalProperties"], false);
-    assert_eq!(items["required"], serde_json::json!(["original", "latex"]));
+    assert_eq!(items["required"], serde_json::json!(["original", "kind"]));
     assert_eq!(items["properties"]["original"]["type"], "string");
-    assert_eq!(items["properties"]["latex"]["type"], "string");
+    assert_eq!(items["properties"]["kind"]["enum"], serde_json::json!(["math", "mixed", "code"]));
 }
 
 #[tokio::test]
@@ -75,19 +75,19 @@ async fn normalizes_mathematical_candidates() {
         "expressions": [
             {
                 "original": "i^{th}",
-                "latex": "$i^{th}$"
+                "kind": "math"
             },
             {
                 "original": "j^{th}",
-                "latex": "$j^{th}$"
+                "kind": "math"
             },
             {
                 "original": "2 * 10^{5}",
-                "latex": r"$2 \times 10^{5}$"
+                "kind": "math"
             },
             {
                 "original": "1 <= n, m <= 2 * 10^{5}",
-                "latex": r"$1 \leq n,m \leq 2 \times 10^{5}$"
+                "kind": "math"
             }
         ]
     });
@@ -108,7 +108,7 @@ Constraints:
 The $i^{th}$ server processes the $j^{th}$ task in at most $2 \\times 10^{5}$ steps.
 
 Constraints:
-* $1 \\leq n,m \\leq 2 \\times 10^{5}$"
+* $1 \\leq n, m \\leq 2 \\times 10^{5}$"
     );
 
     let prompt = read_recorded_prompt(&prompt_path).unwrap();
@@ -116,6 +116,23 @@ Constraints:
     assert!(prompt.contains("j^{th}"));
     assert!(prompt.contains("2 * 10^{5}"));
     assert!(prompt.contains("1 <= n, m <= 2 * 10^{5}"));
+}
+
+#[tokio::test]
+async fn converts_mixed_constraints_and_leaves_code_verdicts_alone() {
+    let dir = tempfile::tempdir().unwrap();
+    let response = serde_json::json!({
+        "expressions": [
+            { "original": "0 <= nums[i] <= 10^{9}", "kind": "mixed" },
+            { "original": "i < n && nums[i] > 0", "kind": "code" }
+        ]
+    });
+    let (normalizer, _) = setup_mock_normalizer(&dir, &response.to_string());
+
+    let markdown = "Loop while `i < n && nums[i] > 0`.\n* `0 <= nums[i] <= 10^{9}`";
+    let normalized = normalizer.normalize(markdown).await.unwrap();
+
+    assert_eq!(normalized, "Loop while `i < n && nums[i] > 0`.\n* $0 \\leq \\mathtt{nums[i]} \\leq 10^{9}$");
 }
 
 #[tokio::test]
@@ -143,11 +160,11 @@ async fn preserves_fenced_code_blocks_links_headings_lists_and_prose_byte_for_by
         "expressions": [
             {
                 "original": "i^{th}",
-                "latex": "$i^{th}$"
+                "kind": "math"
             },
             {
                 "original": "2 * 10^{5}",
-                "latex": r"$2 \times 10^{5}$"
+                "kind": "math"
             }
         ]
     });
@@ -215,7 +232,7 @@ async fn handles_repeated_expressions_across_contexts_correctly() {
         "expressions": [
             {
                 "original": "i^{th}",
-                "latex": "$i^{th}$"
+                "kind": "math"
             }
         ]
     });
@@ -267,7 +284,7 @@ async fn rejects_fabricated_or_invalid_model_transformations() {
             "expressions": [
                 {
                     "original": "The `i^{th}` server",
-                    "latex": "$hacked$"
+                    "kind": "math"
                 }
             ]
         });
@@ -283,11 +300,11 @@ async fn rejects_fabricated_or_invalid_model_transformations() {
             "expressions": [
                 {
                     "original": "i^{th}",
-                    "latex": "$i^{th}$"
+                    "kind": "math"
                 },
                 {
                     "original": "i^{th}",
-                    "latex": "$i^{th}$"
+                    "kind": "math"
                 }
             ]
         });
@@ -296,46 +313,23 @@ async fn rejects_fabricated_or_invalid_model_transformations() {
         assert!(matches!(err, NormalizationError::DuplicateTransformation(_)));
     }
 
-    // 3. Missing inline math delimiters
+    // 3. A kind outside the schema's enum
     {
         let dir = tempfile::tempdir().unwrap();
-        let response = serde_json::json!({
-            "expressions": [
-                {
-                    "original": "i^{th}",
-                    "latex": "i^{th}"
-                }
-            ]
-        });
+        let response = serde_json::json!({ "expressions": [{ "original": "i^{th}", "kind": "formula" }] });
         let (normalizer, _) = setup_mock_normalizer(&dir, &response.to_string());
         let err = normalizer.normalize(markdown).await.unwrap_err();
-        assert!(matches!(err, NormalizationError::InvalidLatexDelimiters { .. }));
+        assert!(matches!(err, NormalizationError::InvalidResponse(_)));
     }
 
-    // 4. Empty LaTeX content
+    // 4. Additional unexpected properties in JSON response
     {
         let dir = tempfile::tempdir().unwrap();
         let response = serde_json::json!({
             "expressions": [
                 {
                     "original": "i^{th}",
-                    "latex": "$$"
-                }
-            ]
-        });
-        let (normalizer, _) = setup_mock_normalizer(&dir, &response.to_string());
-        let err = normalizer.normalize(markdown).await.unwrap_err();
-        assert!(matches!(err, NormalizationError::EmptyLatex { .. }));
-    }
-
-    // 5. Additional unexpected properties in JSON response
-    {
-        let dir = tempfile::tempdir().unwrap();
-        let response = serde_json::json!({
-            "expressions": [
-                {
-                    "original": "i^{th}",
-                    "latex": "$i^{th}$",
+                    "kind": "math",
                     "extra": "disallowed"
                 }
             ]
@@ -352,11 +346,9 @@ fn deterministic_replacement_preserves_untransformed_candidates() {
     let candidates = extract_candidates(markdown);
     assert_eq!(candidates.len(), 2);
 
-    // Model converts `i^{th}` but excludes `1 <= n <= 2^{31} - 1`
-    let response = NormalizationResponse {
-        expressions: vec![ExpressionTransformation { original: "i^{th}".into(), latex: "$i^{th}$".into() }],
-    };
+    // Only `i^{th}` is transformed; `1 <= n <= 2^{31} - 1` stays as written.
+    let transformations = [ExpressionTransformation { original: "i^{th}".into(), latex: "$i^{th}$".into() }];
 
-    let result = apply_transformations(markdown, &candidates, &response.expressions).unwrap();
+    let result = apply_transformations(markdown, &candidates, &transformations).unwrap();
     assert_eq!(result, "Compare $i^{th}$ and `1 <= n <= 2^{31} - 1` in prose.");
 }
